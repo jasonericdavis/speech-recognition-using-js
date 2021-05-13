@@ -1,4 +1,6 @@
 uploads/
+public/media/*
+!public/media/.gitkeep
 
 # Logs
 logs

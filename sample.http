@@ -2,9 +2,18 @@ POST http://localhost:3000/job_completed
 Content-Type: application/json
 
 {
-  "id": "Umx5c6F7pH7r",
-  "status": "in_progress",
-  "created_on": "2018-05-05T23:23:22.29Z",
-  "type": "async",
-  "delete_after_seconds": 50
+    "job" : {
+        "id": "he5zT3uT2aPU",
+        "status": "in_progress",
+        "created_on": "2018-05-05T23:23:22.29Z",
+        "type": "async",
+        "delete_after_seconds": 50
+    }
 }
+
+###
+
+GET http://localhost:3000/transcript/he5zT3uT2aPU/text
+
+###
+GET http://localhost:3000/caption/he5zT3uT2aPU
