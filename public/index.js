@@ -1,25 +1,18 @@
-const socket = new WebSocket(`ws://${location.host}/socket`)
+var socket = io();
+socket.emit('message', 'Hello Everyone')
+socket.on('message', (message) => {
+    console.log(`Recieved message: ${message}`)
+})
 
-socket.onopen = function(e) {
-    console.log(`websocket connection has been established`)
-}
-
-socket.onmessage = function(e) {
-    console.log(e.data)
-
-    const message = JSON.parse(e.data)
-
-    if(message.type && message.type.toLowerCase() === 'job_completed') {
-        fetch(`/transcript/${message.id}/text`)
-        .then(res => res.text())
-        .then(data => {
-            const greeting = document.getElementById('greeting')
-            greeting.innerHTML = data
-        })
-        .catch(err => console.log(err))
-    }
-    
-}
+socket.on('job_completed', (message) => {
+    fetch(`/transcript/${message.id}/text`)
+    .then(res => res.text())
+    .then(data => {
+        const greeting = document.getElementById('greeting')
+        greeting.innerHTML = data
+    })
+    .catch(err => console.log(err))
+})
 
 const submitForm = event => {
     event.preventDefault();
@@ -59,6 +52,52 @@ captionBtn.addEventListener('click', event => {
           };
     })
     .catch(err => console.log(err))
+})
+
+const recordButton = document.getElementById('recordBtn')
+recordButton.addEventListener('click', event => {
+    navigator.mediaDevices.getUserMedia({audio: true, video: true})
+    .then(stream => {
+
+        const videoPlayer = document.getElementById("vPlayer")
+        videoPlayer.srcObject = stream
+        videoPlayer.play()
+
+        const audioChunks = [];
+        const context = new AudioContext();
+        // const audioSourceNode = context.createMediaStreamSource(stream);
+        // //const processor = context.createScriptProcessor(1024,1,1);
+        // const processor = new AudioWorkletNode(context, 'microphone')
+
+        // audioSourceNode.connect(processor);
+        // processor.connect(context.destination);
+
+        //const destination = context.createMediaStreamDestination()
+        const mediaRecorder = new MediaRecorder(stream, {MimeType : 'audio/wav'})
+
+        mediaRecorder.addEventListener("dataavailable", event => {
+            console.log(event.data)
+            audioChunks.push(event.data)
+            socket.send(event.data)
+        })
+
+        mediaRecorder.addEventListener("stop", () => {
+            const audioBlob = new Blob(audioChunks);
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+        });
+
+        mediaRecorder.start(1000);
+
+        setTimeout(() => {
+            mediaRecorder.stop();
+            stream.getTracks().reduce( track => track.stop())
+            video.srcObject = null;
+        }, 10000)
+
+
+    })
 })
 
 

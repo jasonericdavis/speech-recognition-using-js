@@ -1,13 +1,20 @@
 const express = require('express')
-const ws = require('ws')
+const { Server } = require('socket.io')
+const http = require('http')
 const multer = require('multer')
 const env = require('dotenv')
 const { RevAiApiClient, CaptionType } = require('revai-node-sdk');
+
+const app = express();
+const port = 3000;
+const server = http.createServer(app);
+const io = new Server(server);
 
 env.config();
 const access_token = process.env.access_token;
 const callback_url = process.env.callback_url;
 
+// setup multer to get file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, `public/media/`)
@@ -21,9 +28,6 @@ const upload = multer({storage})
 
 // Setup the Rev.ai sdk
 const revai = new RevAiApiClient(access_token);
-
-const app = express()
-const port = 3000
 
 // This middleware has to be called before the routes
 app.use(express.json());
@@ -51,11 +55,12 @@ app.post('/job_completed', (req, res) => {
 
   // broadcast the message to all of the connected clients
   const {id, status} = req.body.job
-  if(wss && wss.clients) {
-    wss.clients.forEach(client => {
-      client.send(JSON.stringify({id, status, type: 'job_completed'}))
-    })
-  }
+  // if(wss && wss.clients) {
+  //   wss.clients.forEach(client => {
+  //     client.send(JSON.stringify({id, status, type: 'job_completed'}))
+  //   })
+  // }
+  io.emit(`job_completed`, {id, status})
   res.sendStatus(200)
 })
 
@@ -105,24 +110,20 @@ app.get('/caption/:jobId', async (req, res) => {
   }
 })
 
+io.on('connection', (socket) => {
+  console.log('a connection was made')
+  socket.on('disconnect', () => {
+    console.log('disconnection detected')
+  })
+
+  socket.on('message', (message) => {
+    console.log(message)
+    io.emit('message', "We received a message")
+  })
+})
 
 app.use(express.static('public'))
 
-const server = app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`)
+server.listen(port, () => {
+  console.log(`Server listening at http://localhost:${port}`)
 })
-
-//add the WebSocket to the server
-const wss = new ws.Server({ server });
-
-wss.on('connection', (ws) => {
-    //connection is up, let's add a simple simple event
-    ws.on('message', (message) => {
-        //log the received message and send it back to the client
-        console.log('received: %s', message);
-        ws.send(JSON.stringify(message));
-    });
-
-    //send immediately a feedback to the incoming connection    
-    ws.send(JSON.stringify({type: 'message' , data: 'Hi there, I am a WebSocket server'}));
-});

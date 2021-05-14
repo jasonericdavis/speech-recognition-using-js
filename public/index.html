@@ -7,11 +7,13 @@
             <input type="file" name="media" >
             <input type="submit">
         </form>
-            <video controls preload="metadata">
+            <video controls preload="metadata" id="vPlayer">
                 <source type="video/mp4" src="media/Sample_512x288.mp4">
                 <track id="caption" kind="subtitles" srclang="en" label="English" default>
             </video>
         <button id="captionBtn">Caption</button>
+        <button id="recordBtn">Record</button>
+        <script src="/socket.io/socket.io.js"></script>
         <script src="index.js"></script>
     </body>
 </html>
