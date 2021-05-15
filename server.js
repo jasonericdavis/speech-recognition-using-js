@@ -65,7 +65,7 @@ app.post('/job_completed', (req, res) => {
   res.sendStatus(200)
 })
 
-app.get('/transcript/:jobId/:format', async (req, res) => {
+app.get('/transcription/:jobId/:format', async (req, res) => {
   try {
     const {jobId, format} = req.params
     console.dir({jobId, format})
@@ -111,19 +111,8 @@ app.get('/caption/:jobId', async (req, res) => {
   }
 })
 
-io.on('connection', (socket) => {
-  console.log('a connection was made')
-  socket.on('disconnect', () => {
-    console.log('disconnection detected')
-  })
-
-  socket.on('message', (message) => {
-    console.log(message)
-    io.emit('message', "We received a message")
-  })
-
-  socket.on('start_stream', (message) => {
-    console.log('Opening the stream')
+app.post('/stream/start', (req, res) => {
+  console.log('Opening the stream')
     revaiStreamingClient = new RevAiStreamingClient(
       access_token, new AudioConfig('audio/x-wav')
     )
@@ -146,15 +135,37 @@ io.on('connection', (socket) => {
 
     revaiStreamingClient.on('data', data => {
       //console.log(`Recieved Data: ${data}`)
-      socket.emit(data)
+      //socket.emit(data)
+      io.local.emit(data)
     })
 
     revStream = revaiStreamingClient.start()
     revStream.on('data', data => {
-      socket.emit('transcript', data)
+      //socket.emit('transcript', data)
+      io.emit('transcript', data)
     })
+    
+    res.sendStatus(200)
+})
+
+app.post('/stream/end', (req, res) => {
+  console.log('Closing stream')
+  revStream = null;
+  revaiStreamingClient.end();
+  revaiStreamingClient = null;
+  res.sendStatus(200)
+})
+
+io.on('connection', (socket) => {
+  console.log('a connection was made')
+  socket.on('disconnect', () => {
+    console.log('disconnection detected')
   })
 
+  socket.on('message', (message) => {
+    console.log(message)
+    io.emit('message', "We received a message")
+  })
 
   socket.on('stream', data => {
     console.log('data received')
@@ -163,13 +174,6 @@ io.on('connection', (socket) => {
     } else {
       console.log('revStream is null')
     }
-  })
-
-  socket.on('end_stream', (message) => {
-    console.log('Closing stream')
-    revStream = null;
-    revaiStreamingClient.end();
-    revaiStreamingClient = null;
   })
 })
 

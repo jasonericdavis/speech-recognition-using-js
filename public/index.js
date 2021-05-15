@@ -2,12 +2,34 @@ let streamingAudio;
 
 const socket = io();
 
+const streamAudio = () => {
+    navigator.mediaDevices.getUserMedia({audio: true, video: false})
+    .then(stream => {
+
+        const videoPlayer = document.getElementById("vPlayer")
+        videoPlayer.srcObject = stream
+        videoPlayer.play()
+
+        streamingAudio = RecordRTC(stream, {
+            type: 'audio',
+            mimeType: 'audio/wav',
+            timeSlice: 500,
+
+            ondataavailable: (blob) => {
+                socket.emit('stream', blob)
+            }
+        })
+
+        streamingAudio.startRecording();
+    })
+}
+
 socket.on('message', (message) => {
     console.log(`Recieved message: ${message}`)
 })
 
 socket.on('job_completed', (message) => {
-    fetch(`/transcript/${message.id}/text`)
+    fetch(`/transcription/${message.id}/text`)
     .then(res => res.text())
     .then(data => {
         const greeting = document.getElementById('greeting')
@@ -70,37 +92,26 @@ captionBtn.addEventListener('click', event => {
     .catch(err => console.log(err))
 })
 
-document.getElementById('startBtn').addEventListener('click', event => {
-    sendMessage('start_stream')
-    navigator.mediaDevices.getUserMedia({audio: true, video: false})
-    .then(stream => {
+document.getElementById('startBtn').addEventListener('click', async (event) => {
+    //sendMessage('start_stream')
 
-        const videoPlayer = document.getElementById("vPlayer")
-        videoPlayer.srcObject = stream
-        videoPlayer.play()
-
-        streamingAudio = RecordRTC(stream, {
-            type: 'audio',
-            mimeType: 'audio/wav',
-            timeSlice: 500,
-
-            ondataavailable: (blob) => {
-                socket.emit('stream', blob)
-            }
-        })
-
-        streamingAudio.startRecording();
+    fetch('/stream/start', {method: 'post'})
+    .then( response => {
+        streamAudio()
     })
 })
 
 
-document.getElementById('stopBtn').addEventListener('click', event => {
-    sendMessage('end_stream')
-    streamingAudio.stopRecording();
+document.getElementById('stopBtn').addEventListener('click', async (event) => {
+    //sendMessage('end_stream')
+    await fetch('/stream/end', {method: 'post'})
+    .then( response => {
+        streamingAudio.stopRecording();
 
-    const videoPlayer = document.getElementById("vPlayer")
-    //videoPlayer.stopRecording()
-    videoPlayer.srcObject = null
-    console.log("Recording ended")
+        const videoPlayer = document.getElementById("vPlayer")
+        //videoPlayer.stopRecording()
+        videoPlayer.srcObject = null
+        console.log("Recording ended")
+    })
 })
 

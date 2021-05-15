@@ -17,3 +17,7 @@ GET http://localhost:3000/transcript/he5zT3uT2aPU/text
 
 ###
 GET http://localhost:3000/caption/he5zT3uT2aPU
+
+###
+
+POST http://localhost:3000/stream/end
