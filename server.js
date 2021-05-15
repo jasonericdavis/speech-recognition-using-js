@@ -1,9 +1,10 @@
+
+const env = require('dotenv')
 const express = require('express')
-const { Server } = require('socket.io')
 const http = require('http')
 const multer = require('multer')
-const env = require('dotenv')
 const { RevAiApiClient, CaptionType, RevAiStreamingClient, AudioConfig } = require('revai-node-sdk');
+const { Server } = require('socket.io')
 
 const app = express();
 const port = 3000;
@@ -12,7 +13,7 @@ const io = new Server(server);
 
 env.config();
 const access_token = process.env.access_token;
-const callback_url = process.env.callback_url;
+const webhook_url = process.env.webhook_url;
 
 // setup multer to get file uploads
 const storage = multer.diskStorage({
@@ -27,8 +28,8 @@ const storage = multer.diskStorage({
 const upload = multer({storage})
 
 // Setup the Rev.ai sdk
-const revai = new RevAiApiClient(access_token);
-let revaiStreamingClient;
+const asyncClient = new RevAiApiClient(access_token);
+let streamingClient;
 
 // This middleware has to be called before the routes
 app.use(express.json());
@@ -37,12 +38,12 @@ app.use(express.json());
  *  Notes: There is currently a 10MB limit on the size of the audio file because 
  * of a limitiation in axios with the maxBodyLength and maxContentLength
  */
-app.post('/upload_file', upload.single('media'), async (req, res, next) => {
-  console.log(`upload_file: ${req.file}`)
-  console.log(`callback_url: ${callback_url}`)
+app.post('/media', upload.single('mediaFile'), async (req, res, next) => {
+  console.log(`filename: ${req.file}`)
+  console.log(`callback_url: ${webhook_url}`)
   try {
-    const job = await revai.submitJobLocalFile(req.file.path, {
-      callback_url
+    const job = await asyncClient.submitJobLocalFile(req.file.path, {
+      callback_url: webhook_url
     })
     res.json(job);
   } catch(err) {
@@ -51,17 +52,10 @@ app.post('/upload_file', upload.single('media'), async (req, res, next) => {
   }
 })
 
-app.post('/job_completed', (req, res) => {
+app.post('/job', (req, res) => {
   console.dir(`webhook received: ${JSON.stringify(req.body)}`)
-
-  // broadcast the message to all of the connected clients
   const {id, status} = req.body.job
-  // if(wss && wss.clients) {
-  //   wss.clients.forEach(client => {
-  //     client.send(JSON.stringify({id, status, type: 'job_completed'}))
-  //   })
-  // }
-  io.emit(`job_completed`, {id, status})
+  io.emit(`job`, {id, status})
   res.sendStatus(200)
 })
 
@@ -71,13 +65,13 @@ app.get('/transcription/:jobId/:format', async (req, res) => {
     console.dir({jobId, format})
 
     if(format.toLowerCase() === 'json') {
-      const transcript = await revai.getTranscriptObject(jobId)
+      const transcript = await asyncClient.getTranscriptObject(jobId)
       res.json(transcript)
       return
     }
 
     if(format.toLowerCase() === 'text') {
-      const transcript = await revai.getTranscriptText(jobId)
+      const transcript = await asyncClient.getTranscriptText(jobId)
       res.send(transcript)
       return
     }
@@ -93,7 +87,7 @@ app.get('/caption/:jobId', async (req, res) => {
     const {jobId} = req.params
     console.dir(jobId)
     let output = '';
-    const caption = await revai.getCaptions(jobId, CaptionType.VTT)
+    const caption = await asyncClient.getCaptions(jobId, CaptionType.VTT)
     .then(response => {
       const stream = response
       stream.on('data', chunk => {
@@ -113,35 +107,28 @@ app.get('/caption/:jobId', async (req, res) => {
 
 app.post('/stream/start', (req, res) => {
   console.log('Opening the stream')
-    revaiStreamingClient = new RevAiStreamingClient(
+    streamingClient = new RevAiStreamingClient(
       access_token, new AudioConfig('audio/x-wav')
     )
 
-    revaiStreamingClient.on('close', (code, reason) => {
+    streamingClient.on('close', (code, reason) => {
       console.log(`Connection closed, ${code}: ${reason}`);
     })
 
-    revaiStreamingClient.on('httpResponse', code => {
+    streamingClient.on('httpResponse', code => {
       console.log(`Streaming client received http response with code: ${code}`);
     })
 
-    revaiStreamingClient.on('connectFailed', error => {
+    streamingClient.on('connectFailed', error => {
         console.log(`Connection failed with error: ${error}`);
     })
 
-    revaiStreamingClient.on('connect', connectionMessage => {
+    streamingClient.on('connect', connectionMessage => {
         console.log(`Connected with job id: ${connectionMessage.id}`);
     })
 
-    revaiStreamingClient.on('data', data => {
-      //console.log(`Recieved Data: ${data}`)
-      //socket.emit(data)
-      io.local.emit(data)
-    })
-
-    revStream = revaiStreamingClient.start()
+    revStream = streamingClient.start()
     revStream.on('data', data => {
-      //socket.emit('transcript', data)
       io.emit('transcript', data)
     })
     
@@ -151,8 +138,8 @@ app.post('/stream/start', (req, res) => {
 app.post('/stream/end', (req, res) => {
   console.log('Closing stream')
   revStream = null;
-  revaiStreamingClient.end();
-  revaiStreamingClient = null;
+  streamingClient.end();
+  streamingClient = null;
   res.sendStatus(200)
 })
 
@@ -163,17 +150,13 @@ io.on('connection', (socket) => {
   })
 
   socket.on('message', (message) => {
-    console.log(message)
-    io.emit('message', "We received a message")
+    console.log(`Message recieved: ${message}`)
+    io.emit('message', message)
   })
 
   socket.on('stream', data => {
     console.log('data received')
-    if(revStream) {
-      revStream.write(data)
-    } else {
-      console.log('revStream is null')
-    }
+    revStream && revStream.write(data)
   })
 })
 

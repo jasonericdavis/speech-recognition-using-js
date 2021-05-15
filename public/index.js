@@ -2,6 +2,30 @@ let streamingAudio;
 
 const socket = io();
 
+socket.on('message', (message) => {
+    console.log(`Recieved message: ${message}`)
+})
+
+socket.on('job', (message) => {
+    fetch(`/transcription/${message.id}/text`)
+    .then(res => res.text())
+    .then(data => {
+        const transcriptionEl = document.getElementById('transcription')
+        transcriptionEl.innerHTML = data
+    })
+    .catch(err => console.log(err))
+})
+
+socket.on('transcript', data => {
+    console.log(`transcript: ${JSON.stringify(data)}`)
+    const messageEl = document.getElementById('message');
+    const output = data.elements.reduce((acc, val) => {
+        acc = `${acc} ${val.value}`
+        return acc
+    }, "")
+    messageEl.innerHTML = `${output}`
+})
+
 const streamAudio = () => {
     navigator.mediaDevices.getUserMedia({audio: true, video: false})
     .then(stream => {
@@ -24,56 +48,29 @@ const streamAudio = () => {
     })
 }
 
-socket.on('message', (message) => {
-    console.log(`Recieved message: ${message}`)
-})
-
-socket.on('job_completed', (message) => {
-    fetch(`/transcription/${message.id}/text`)
-    .then(res => res.text())
-    .then(data => {
-        const greeting = document.getElementById('greeting')
-        greeting.innerHTML = data
-    })
-    .catch(err => console.log(err))
-})
-
-socket.on('transcript', data => {
-    console.log(`transcript: ${JSON.stringify(data)}`)
-    const messageEl = document.getElementById('message');
-    const output = data.elements.reduce((acc, val) => {
-        acc = `${acc} ${val.value}`
-        return acc
-    }, "")
-    messageEl.innerHTML = `${output}`
-})
-
-const submitForm = event => {
+const uploadMedia = event => {
     event.preventDefault();
     const formData = new FormData();
-    const mediaFile = document.getElementsByName("media")[0].files[0]
-    formData.append("media", mediaFile)
+    const mediaFile = document.getElementsByName("mediaFile")[0].files[0]
+    formData.append("mediaFile", mediaFile)
 
-    fetch("/upload_file", {
+    fetch("/media", {
         method: 'POST',
         body: formData
     })
-    .then(res => res.json)
-    .then(data  => console.log(data))
+    .then(res => res.json())
+    .then(data  => {
+        console.dir(data)
+    })
     .catch(err => console.log(err))
 
     console.log(`Form Submitted`);
 }
 
-const sendMessage = (type, message) => {
-    socket.connected && socket.emit(type, message)
-}
+document.getElementById("form").addEventListener("submit", uploadMedia)
 
-const form = document.getElementById("form");
-form.addEventListener("submit", submitForm)
-
-const captionBtn = document.getElementById("captionBtn")
-captionBtn.addEventListener('click', event => {
+document.getElementById("captionBtn")
+.addEventListener('click', event => {
     fetch(`/caption?job_id=x7Y0izuCGWRR`)
     .then(res => res.text())
     .then(data => {
@@ -93,23 +90,18 @@ captionBtn.addEventListener('click', event => {
 })
 
 document.getElementById('startBtn').addEventListener('click', async (event) => {
-    //sendMessage('start_stream')
-
     fetch('/stream/start', {method: 'post'})
     .then( response => {
         streamAudio()
     })
 })
 
-
 document.getElementById('stopBtn').addEventListener('click', async (event) => {
-    //sendMessage('end_stream')
     await fetch('/stream/end', {method: 'post'})
     .then( response => {
         streamingAudio.stopRecording();
 
         const videoPlayer = document.getElementById("vPlayer")
-        //videoPlayer.stopRecording()
         videoPlayer.srcObject = null
         console.log("Recording ended")
     })
