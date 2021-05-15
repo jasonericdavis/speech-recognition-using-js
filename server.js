@@ -3,7 +3,7 @@ const { Server } = require('socket.io')
 const http = require('http')
 const multer = require('multer')
 const env = require('dotenv')
-const { RevAiApiClient, CaptionType } = require('revai-node-sdk');
+const { RevAiApiClient, CaptionType, RevAiStreamingClient, AudioConfig } = require('revai-node-sdk');
 
 const app = express();
 const port = 3000;
@@ -28,6 +28,7 @@ const upload = multer({storage})
 
 // Setup the Rev.ai sdk
 const revai = new RevAiApiClient(access_token);
+let revaiStreamingClient;
 
 // This middleware has to be called before the routes
 app.use(express.json());
@@ -119,6 +120,56 @@ io.on('connection', (socket) => {
   socket.on('message', (message) => {
     console.log(message)
     io.emit('message', "We received a message")
+  })
+
+  socket.on('start_stream', (message) => {
+    console.log('Opening the stream')
+    revaiStreamingClient = new RevAiStreamingClient(
+      access_token, new AudioConfig('audio/x-wav')
+    )
+
+    revaiStreamingClient.on('close', (code, reason) => {
+      console.log(`Connection closed, ${code}: ${reason}`);
+    })
+
+    revaiStreamingClient.on('httpResponse', code => {
+      console.log(`Streaming client received http response with code: ${code}`);
+    })
+
+    revaiStreamingClient.on('connectFailed', error => {
+        console.log(`Connection failed with error: ${error}`);
+    })
+
+    revaiStreamingClient.on('connect', connectionMessage => {
+        console.log(`Connected with job id: ${connectionMessage.id}`);
+    })
+
+    revaiStreamingClient.on('data', data => {
+      //console.log(`Recieved Data: ${data}`)
+      socket.emit(data)
+    })
+
+    revStream = revaiStreamingClient.start()
+    revStream.on('data', data => {
+      socket.emit('transcript', data)
+    })
+  })
+
+
+  socket.on('stream', data => {
+    console.log('data received')
+    if(revStream) {
+      revStream.write(data)
+    } else {
+      console.log('revStream is null')
+    }
+  })
+
+  socket.on('end_stream', (message) => {
+    console.log('Closing stream')
+    revStream = null;
+    revaiStreamingClient.end();
+    revaiStreamingClient = null;
   })
 })
 

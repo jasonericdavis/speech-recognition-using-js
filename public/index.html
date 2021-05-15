@@ -1,18 +1,24 @@
 <html>
     <head></head>
     <body>
-        <div id="greeting">Hello Everyone!</div>
         <form id="form">
             <!-- TODO:L limit the size of the file to 10MB -->
             <input type="file" name="media" >
             <input type="submit">
         </form>
+        <div>
             <video controls preload="metadata" id="vPlayer">
-                <source type="video/mp4" src="media/Sample_512x288.mp4">
+                <source type="video/mp4">
                 <track id="caption" kind="subtitles" srclang="en" label="English" default>
             </video>
-        <button id="captionBtn">Caption</button>
-        <button id="recordBtn">Record</button>
+        </div>
+        <div id="message">Hello Everyone!</div>
+        <div style="padding-top: 20px">
+            <button id="captionBtn">Caption</button>
+            <button id="startBtn">Start Recording</button>
+            <button id="stopBtn">Stop Recording</button>
+        </div>
+        <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
         <script src="/socket.io/socket.io.js"></script>
         <script src="index.js"></script>
     </body>
