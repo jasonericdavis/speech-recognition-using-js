@@ -1,0 +1,39 @@
+POST http://localhost:3000/job
+Content-Type: application/json
+
+{
+    "job" : {
+        "id": "he5zT3uT2aPU",
+        "status": "in_progress",
+        "created_on": "2018-05-05T23:23:22.29Z",
+        "type": "async",
+        "delete_after_seconds": 50
+    }
+}
+
+###
+POST http://localhost:3000/job
+Content-Type: application/json
+
+{
+    "job": {
+        "callback_url": "http://499fe07c74b2.ngrok.io/job",
+        "created_on": "2021-05-17T19:07:32.407Z",
+        "id": "zEmtqu2huLBz",
+        "media_url": "http://499fe07c74b2.ngrok.io/media/sample-1.mp3",
+        "name": "sample-1.mp3",
+        "status": "in_progress",
+        "type": "async"
+    }
+}
+
+###
+
+GET http://localhost:3000/transcript/he5zT3uT2aPU/text
+
+###
+GET http://localhost:3000/caption/he5zT3uT2aPU
+
+###
+
+POST http://localhost:3000/stream/end
