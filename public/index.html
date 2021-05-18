@@ -23,6 +23,10 @@
                 padding-top: 20px;
             }
 
+            .output-type {
+                padding-top: 20px;
+            }
+
             form div {
                 padding-top: 10px;
             }
@@ -30,21 +34,30 @@
             form label {
                 display: block;
             }
+
+            ::cue {
+                font-size: 2.0em;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="container-item">
-                <video controls preload="metadata" id="player">
+                <video preload="metadata" id="media_player" controls>
                     <source type="video/mp4">
                     <track id="caption" kind="subtitles" srclang="en" label="English" default>
                 </video>
+                <div class="output-type">
+                    <input type="radio" id="captionRb" name="output-type" value="caption">
+                    <label for="caption">Caption</label><br>
+                    <input type="radio" id="transcriptionRb" name="output-type" value="transcription" checked>
+                    <label for="transcription">Transcription</label><br>
+                </div>
                 <div id="transcription" class="transcription">Waiting for a transcription</div>                
             </div>
             <div class="container-item">
-                <h2>Choose a file to process</h2>
+                <h2>Choose an audio/video file to process</h2>
                 <form id="form">
-                    <!-- TODO:L limit the size of the file to 10MB -->
                     <div>
                         <label for="mediaFile">Choose a media file to process</label>
                         <input type="file" name="mediaFile" >
@@ -59,12 +72,7 @@
                     <button id="startBtn">Start Recording</button>
                     <button id="stopBtn">Stop Recording</button>
                 </div>
-
             </div>
-
-            
-            
-            
             <script src="https://www.WebRTC-Experiment.com/RecordRTC.js"></script>
             <script src="/socket.io/socket.io.js"></script>
             <script src="index.js"></script>

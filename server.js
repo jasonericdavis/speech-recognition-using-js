@@ -13,14 +13,16 @@ const io = new Server(server);
 
 env.config();
 const access_token = process.env.access_token;
-const webhook_url = process.env.webhook_url;
+const base_url = process.env.base_url || `http://localhost${port}`
+const media_path = process.env.media_path || 'public/media/'
 
 // setup multer to get file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, `public/media/`)
+    cb(null, media_path)
   },
 
+  // for this example we just want to use the same filename as before
   filename: (req, file, cb) => {
     cb(null, file.originalname)
   }
@@ -39,11 +41,13 @@ app.use(express.json());
  * of a limitiation in axios with the maxBodyLength and maxContentLength
  */
 app.post('/media', upload.single('mediaFile'), async (req, res, next) => {
-  console.log(`filename: ${req.file}`)
-  console.log(`callback_url: ${webhook_url}`)
+  const media_url = `${base_url}/media/${req.file.filename}`
+  const webhook_url = `${base_url}/job`;
+  console.log(`submit job: ${JSON.stringify({media_url, webhook_url})}`)
+  
   try {
-    const job = await asyncClient.submitJobLocalFile(req.file.path, {
-      callback_url: webhook_url
+    const job = await asyncClient.submitJobUrl(media_url, {
+      callback_url: webhook_url,
     })
     res.json(job);
   } catch(err) {
@@ -53,9 +57,8 @@ app.post('/media', upload.single('mediaFile'), async (req, res, next) => {
 })
 
 app.post('/job', (req, res) => {
-  console.dir(`webhook received: ${JSON.stringify(req.body)}`)
-  const {id, status} = req.body.job
-  io.emit(`job`, {id, status})
+  console.log(`webhook received: ${JSON.stringify(req.body)}`)
+  io.emit(`job`, req.body)
   res.sendStatus(200)
 })
 
@@ -87,7 +90,7 @@ app.get('/caption/:jobId', async (req, res) => {
     const {jobId} = req.params
     console.dir(jobId)
     let output = '';
-    const caption = await asyncClient.getCaptions(jobId, CaptionType.VTT)
+    await asyncClient.getCaptions(jobId, CaptionType.VTT)
     .then(response => {
       const stream = response
       stream.on('data', chunk => {
@@ -144,23 +147,20 @@ app.post('/stream/end', (req, res) => {
 })
 
 io.on('connection', (socket) => {
-  console.log('a connection was made')
+  console.log(`connection made (${socket.id})`)
+  
   socket.on('disconnect', () => {
-    console.log('disconnection detected')
-  })
-
-  socket.on('message', (message) => {
-    console.log(`Message recieved: ${message}`)
-    io.emit('message', message)
+    console.log(`disconnection (${socket.id})`)
   })
 
   socket.on('stream', data => {
-    console.log('data received')
+    console.log('stream data received')
     revStream && revStream.write(data)
   })
 })
 
 app.use(express.static('public'))
+app.use('/media', express.static(media_path))
 
 server.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`)
